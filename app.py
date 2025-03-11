@@ -37,6 +37,7 @@ class NVMeTool(QMainWindow):
         self.stopButton = QPushButton("Stop Benchmark")
         self.metricsButton = QPushButton("Start Metrics")
         self.metricsDisplay = QTextEdit()
+        self.updateButton = QPushButton("Update App")
 
         layout.addWidget(self.driveList)
         layout.addWidget(self.refreshButton)
@@ -44,6 +45,7 @@ class NVMeTool(QMainWindow):
         layout.addWidget(self.stopButton)
         layout.addWidget(self.metricsButton)
         layout.addWidget(self.metricsDisplay)
+        layout.addWidget(self.updateButton)
 
         container = QWidget()
         container.setLayout(layout)
@@ -53,6 +55,7 @@ class NVMeTool(QMainWindow):
         self.benchmarkButton.clicked.connect(self.runBenchmark)
         self.stopButton.clicked.connect(self.stopBenchmark)
         self.metricsButton.clicked.connect(self.startMetrics)
+        self.updateButton.clicked.connect(self.updateApp)
 
         self.benchmark_processes = []
         self.timer = QTimer()
@@ -138,6 +141,16 @@ class NVMeTool(QMainWindow):
             return metrics
         except Exception as e:
             return f"Error fetching metrics for {drive_node}: {e}"
+
+    def updateApp(self):
+        try:
+            result = subprocess.run(["git", "pull", "https://github.com/Gimel12/nvme_stress_test.git"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode == 0:
+                print("Update successful:", result.stdout)
+            else:
+                print("Update failed:", result.stderr)
+        except Exception as e:
+            print(f"Error updating app: {e}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
