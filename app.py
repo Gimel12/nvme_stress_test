@@ -27,7 +27,7 @@ class NVMeTool(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("NVMe Tool")
+        self.setWindowTitle("BIZON NVME stress tool")
         self.setGeometry(100, 100, 800, 600)
 
         layout = QVBoxLayout()
