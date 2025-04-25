@@ -1,57 +1,3 @@
-# Make sure to install the tools and they work
-
-```
-# Install the cli tool to control nvmes on terminal 
-sudo apt install nvme-cli
-
-
-# List all your nvmes 
-sudo nvme list
-
-# Running a test 
-
-sudo nvme device-self-test /dev/nvme1n1 -s 2 
-
-sudo nvme device-self-test /dev/nvme2n1 -s 2 
-
-sudo nvme device-self-test /dev/nvme3n1 -s 2 
-
-sudo nvme device-self-test /dev/nvme4n1 -s 2 
-
-sudo nvme device-self-test /dev/nvme5n1 -s 2 
-
-
-# Check info including temps about nvmes 
-sudo watch nvme smart-log /dev/nvme1n1  
-
-sudo watch nvme smart-log /dev/nvme2n1 
-
-sudo watch nvme smart-log /dev/nvme3n1
-
-sudo watch nvme smart-log /dev/nvme4n1
-
-sudo watch nvme smart-log /dev/nvme5n1
-
-
-
-/dev/nvme1n1                    
-/dev/nvme2n1                      
-/dev/nvme3n1                     
-/dev/nvme4n1                    
-/dev/nvme5n1
-```bash 
-
-# Custom GUI nvme benchmark for Linux.
-
-What need to have: 
-
-- NVME selection
-- Run the test until hard drive is full
-- Temperature monitor
-- Critical temperature treshold notification
-- Speed
-
-
 # NVMe AI Workload Stress Test
 
 This script provides a comprehensive stress testing tool for NVMe drives, specifically optimized for evaluating performance under AI workloads. It helps you determine if your NVMe drive can handle the thermal and performance demands of AI training and inference tasks.
@@ -124,3 +70,58 @@ After running the test, check the log file for:
 - Always ensure you don't have important unsaved data on the drive being tested
 - For maximum stress, run the test for at least 30 minutes (1800 seconds)
 
+## Deploy to Bizon users 
+```bash
+curl -O https://raw.githubusercontent.com/Gimel12/nvme_stress_test/main/nvme.sh && sudo chmod +x nvme.sh && sudo ./nvme.sh
+```
+
+
+# Install the cli tool to control nvmes on terminal 
+sudo apt install nvme-cli
+
+
+# List all your nvmes 
+sudo nvme list
+
+# Running a test 
+
+sudo nvme device-self-test /dev/nvme1n1 -s 2 
+
+sudo nvme device-self-test /dev/nvme2n1 -s 2 
+
+sudo nvme device-self-test /dev/nvme3n1 -s 2 
+
+sudo nvme device-self-test /dev/nvme4n1 -s 2 
+
+sudo nvme device-self-test /dev/nvme5n1 -s 2 
+
+
+# Check info including temps about nvmes 
+sudo watch nvme smart-log /dev/nvme1n1  
+
+sudo watch nvme smart-log /dev/nvme2n1 
+
+sudo watch nvme smart-log /dev/nvme3n1
+
+sudo watch nvme smart-log /dev/nvme4n1
+
+sudo watch nvme smart-log /dev/nvme5n1
+
+
+
+/dev/nvme1n1                    
+/dev/nvme2n1                      
+/dev/nvme3n1                     
+/dev/nvme4n1                    
+/dev/nvme5n1
+
+
+# Custom GUI nvme benchmark for Linux.
+
+What need to have: 
+
+- NVME selection
+- Run the test until hard drive is full
+- Temperature monitor
+- Critical temperature treshold notification
+- Speed
