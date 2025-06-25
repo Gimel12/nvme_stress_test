@@ -8,7 +8,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QPushButton, QComboBox, QSpinBox, QLineEdit, 
                             QTextEdit, QGroupBox, QFormLayout, QMessageBox, QTabWidget,
-                            QProgressBar, QCheckBox, QRadioButton, QButtonGroup)
+                            QProgressBar, QCheckBox, QRadioButton, QButtonGroup, QDialog)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread
 from PyQt5.QtGui import QFont, QIcon, QTextCursor
 
@@ -112,6 +112,11 @@ class NVMeStressTestGUI(QMainWindow):
         self.refresh_button = QPushButton("Refresh Devices")
         self.refresh_button.clicked.connect(self.detect_nvme_devices)
         refresh_layout.addWidget(self.refresh_button)
+
+        self.health_check_button = QPushButton("Check Device Health")
+        self.health_check_button.clicked.connect(self.show_health_report)
+        self.health_check_button.setEnabled(False)
+        refresh_layout.addWidget(self.health_check_button)
         
         self.device_combo = QComboBox()
         self.device_combo.setMinimumWidth(400)
@@ -120,6 +125,7 @@ class NVMeStressTestGUI(QMainWindow):
         
         # Device info
         self.device_info = QLabel("No device selected")
+        self.device_info.setTextFormat(Qt.RichText)
         device_layout.addWidget(self.device_info)
         test_layout.addWidget(device_group)
         
@@ -284,6 +290,7 @@ class NVMeStressTestGUI(QMainWindow):
             
             if not self.nvme_devices:
                 self.device_info.setText("No NVMe devices found")
+                self.health_check_button.setEnabled(False)
             else:
                 self.device_combo.setCurrentIndex(0)
                 self.update_device_info()
@@ -298,17 +305,100 @@ class NVMeStressTestGUI(QMainWindow):
         idx = self.device_combo.currentIndex()
         if idx >= 0 and idx < len(self.nvme_devices):
             device = self.nvme_devices[idx]
+            self.health_check_button.setEnabled(True)
             
             # Check if mounted
             is_mounted = self.check_if_mounted(device['name'])
             mount_status = "Currently mounted" if is_mounted else "Not mounted"
             
+            # Get health summary
+            health_summary, health_color = self.get_health_summary(device['path'])
+
             self.device_info.setText(
                 f"Device: {device['path']}\n"
                 f"Size: {device['size']}\n"
                 f"Model: {device['model']}\n"
-                f"Status: {mount_status}"
+                f"Status: {mount_status}\n"
+                f"<b>Health: <font color='{health_color}'>{health_summary}</font></b>"
             )
+
+    def get_health_summary(self, device_path):
+        try:
+            if not self.is_tool("smartctl"):
+                return "smartctl not found", "orange"
+
+            result = subprocess.run(
+                ["sudo", "smartctl", "-H", device_path],
+                capture_output=True, text=True, timeout=5
+            )
+            
+            output = result.stdout.lower() + result.stderr.lower()
+            if "overall-health self-assessment test result: passed" in output or "health status: ok" in output:
+                return "Healthy", "green"
+            elif "overall-health self-assessment test result: failed" in output:
+                return "Failed", "red"
+            else:
+                return "Unknown", "orange"
+        except subprocess.TimeoutExpired:
+            return "Timeout", "orange"
+        except Exception:
+            return "Error fetching status", "red"
+
+    def show_health_report(self):
+        idx = self.device_combo.currentIndex()
+        if idx < 0:
+            return
+            
+        device = self.nvme_devices[idx]
+        device_path = device['path']
+
+        if not self.is_tool("smartctl"):
+            QMessageBox.critical(self, "Error", "smartctl command not found. Please install 'smartmontools'.")
+            return
+
+        try:
+            self.status_label.setText(f"Running health check on {device_path}...")
+            QApplication.processEvents()
+
+            result = subprocess.run(
+                ["sudo", "smartctl", "-a", device_path],
+                capture_output=True, text=True, timeout=10
+            )
+            
+            self.status_label.setText("Ready")
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"SMART Health Report for {device_path}")
+            dialog.setMinimumSize(700, 500)
+            
+            layout = QVBoxLayout()
+            text_edit = QTextEdit()
+            text_edit.setReadOnly(True)
+            text_edit.setFont(QFont("Monospace", 9))
+            text_edit.setText(result.stdout if result.stdout else result.stderr)
+            layout.addWidget(text_edit)
+            
+            close_button = QPushButton("Close")
+            close_button.clicked.connect(dialog.close)
+            layout.addWidget(close_button)
+            
+            dialog.setLayout(layout)
+            dialog.exec_()
+
+        except subprocess.TimeoutExpired:
+            self.status_label.setText("Ready")
+            QMessageBox.critical(self, "Error", "Health check timed out.")
+        except Exception as e:
+            self.status_label.setText("Ready")
+            QMessageBox.critical(self, "Error", f"Failed to run health check: {str(e)}")
+
+    def is_tool(self, name):
+        """Check whether `name` is on PATH."""
+        try:
+            subprocess.run([name, "--version"], capture_output=True, text=True, check=True, timeout=2)
+            return True
+        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            return False
     
     def check_if_mounted(self, device_name):
         try:
@@ -323,123 +413,71 @@ class NVMeStressTestGUI(QMainWindow):
         if idx < 0 or idx >= len(self.nvme_devices):
             QMessageBox.warning(self, "Warning", "Please select an NVMe device")
             return
-        
+
         device = self.nvme_devices[idx]
         device_path = device['path']
-        
-        # Check if mounted
+
+        # Check if mounted and unmount if necessary
         is_mounted = self.check_if_mounted(device['name'])
-        if is_mounted and not self.auto_unmount.isChecked():
-            QMessageBox.critical(
-                self, 
-                "Error", 
-                f"Device {device_path} is mounted. Please enable auto-unmount or unmount it manually."
-            )
-            return
-        
-        # Get test parameters
-        duration = self.duration_spin.value()
-        log_name = self.log_name_edit.text().strip()
-        
-        # Generate log file name if not provided
-        if not log_name:
-            log_name = f"nvme_stress_{device['name']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        else:
-            # Clean up log name
-            log_name = ''.join(c if c.isalnum() or c in '_-' else '_' for c in log_name)
-            log_name = f"{log_name}_nvme_{device['name']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
-        self.log_file = f"{log_name}.log"
-        
-        # Prepare command based on workload type
-        if self.workload_ai.isChecked():
-            # AI workload
-            fio_cmd = (
-                f"fio --name=ai_data_load --filename={device_path} --rw=randrw --rwmixread=70 "
-                f"--bs=128k --size=4G --numjobs=8 --iodepth=32 --direct=1 --time_based "
-                f"--runtime={duration} --group_reporting "
-                f"--name=ai_model_checkpoint --filename={device_path} --stonewall --rw=write "
-                f"--bs=1m --size=2G --numjobs=4 --iodepth=16 --direct=1 --time_based "
-                f"--runtime={duration} --group_reporting"
-            )
-        else:
-            # Standard workload
-            fio_cmd = (
-                f"fio --name=nvme_stress_test --filename={device_path} --rw=randrw "
-                f"--bs=4k --size=1G --numjobs=4 --time_based --runtime={duration} "
-                f"--group_reporting"
-            )
-        
-        # Build the full command with unmounting if needed
-        command_parts = []
-        
-        # Add unmounting if needed and enabled
         if is_mounted and self.auto_unmount.isChecked():
-            # Get mounted partitions
             try:
                 result = subprocess.run(
                     f"grep '{device_path}' /proc/mounts | awk '{{print $1}}'",
                     shell=True, capture_output=True, text=True
                 )
                 mounted_parts = result.stdout.strip().split('\n')
-                
                 for part in mounted_parts:
                     if part:
-                        command_parts.append(f"umount {part}")
+                        # Use pkexec for graphical sudo prompt
+                        unmount_cmd = f"pkexec umount {part}"
+                        unmount_proc = subprocess.run(unmount_cmd, shell=True, capture_output=True, text=True)
+                        if unmount_proc.returncode != 0:
+                            QMessageBox.critical(self, "Error", f"Failed to unmount {part}:\n{unmount_proc.stderr}")
+                            return
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to get mount info: {str(e)}")
                 return
-        
-        # Add SMART data collection before test
-        command_parts.append(f"echo '--- SMART info for {device_path} at $(date) ---' > {self.log_file}")
-        command_parts.append(f"smartctl -a {device_path} >> {self.log_file} 2>&1")
-        command_parts.append(f"echo '----------------------' >> {self.log_file}")
-        
-        # Add temperature logging in background
-        command_parts.append(
-            f"(while true; do "
-            f"echo \"[TEMP] $(date): $(smartctl -a {device_path} | grep -i temperature)\" >> {self.log_file}; "
-            f"sleep 5; "
-            f"done) & TEMP_PID=$!"
-        )
-        
-        # Add the main FIO command
-        command_parts.append(f"echo 'Running stress test on {device_path} for {duration} seconds...' | tee -a {self.log_file}")
-        command_parts.append(f"{fio_cmd} | tee -a {self.log_file}")
-        
-        # Kill temperature logging
-        command_parts.append("kill $TEMP_PID 2>/dev/null")
-        command_parts.append("wait $TEMP_PID 2>/dev/null")
-        
-        # Add SMART data collection after test
-        command_parts.append(f"echo '--- SMART info for {device_path} at $(date) ---' >> {self.log_file}")
-        command_parts.append(f"smartctl -a {device_path} >> {self.log_file} 2>&1")
-        command_parts.append(f"echo '----------------------' >> {self.log_file}")
-        
-        # Combine all commands
-        full_command = " && ".join(command_parts)
-        
-        # Use pkexec to run with elevated privileges
-        full_command = f"pkexec bash -c '{full_command}'"
-        
-        # Update UI
-        self.console_output.clear()
-        self.temp_output.clear()
-        self.status_label.setText(f"Running test on {device_path}...")
+        elif is_mounted and not self.auto_unmount.isChecked():
+            QMessageBox.critical(self, "Error", f"Device {device_path} is mounted. Please enable auto-unmount or unmount it manually.")
+            return
+
+        # Get test parameters
+        duration = self.duration_spin.value()
+        log_name = self.log_name_edit.text().strip()
+
+        # Generate log file name
+        if not log_name:
+            log_name = f"nvme_stress_{device['name']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        else:
+            log_name = ''.join(c if c.isalnum() or c in '_-' else '_' for c in log_name)
+        self.log_file = os.path.abspath(f"{log_name}.log")
+
+        # Prepare to call the external script
+        workload_type = "ai" if self.workload_ai.isChecked() else "standard"
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_single_drive_test.sh")
+
+        if not os.path.exists(script_path):
+            QMessageBox.critical(self, "Error", f"Test script not found at {script_path}")
+            return
+
+        # The command is now a simple call to our robust shell script
+        full_command = f'"{script_path}" "{device_path}" {duration} "{self.log_file}" "{workload_type}"'
+
+        # Start worker thread
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
-        self.progress_bar.setValue(0)
-        
-        # Start the worker thread
+        self.status_label.setText(f"Starting test on {device_path}...")
+        self.console_output.clear()
+        self.temp_output.clear()
+
+        self.test_duration = duration
+        self.start_time = time.time()
+        self.timer.start(1000)  # Update every second
+
         self.worker_thread = WorkerThread(full_command, self.log_file)
         self.worker_thread.update_signal.connect(self.update_output)
         self.worker_thread.finished_signal.connect(self.test_finished)
         self.worker_thread.start()
-        
-        # Start progress timer
-        self.start_time = time.time()
-        self.test_duration = duration
-        self.timer.start(1000)  # Update every second
     
     def stop_test(self):
         if self.worker_thread and self.worker_thread.isRunning():
