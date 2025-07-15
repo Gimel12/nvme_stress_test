@@ -2,6 +2,41 @@
 
 This script provides a comprehensive stress testing tool for NVMe drives, specifically optimized for evaluating performance under AI workloads. It helps you determine if your NVMe drive can handle the thermal and performance demands of AI training and inference tasks.
 
+## Quick Start
+
+### Installation
+
+1. **Clone or download this repository**
+2. **Run the installation script**:
+   ```bash
+   ./install.sh
+   ```
+   This will:
+   - Install required dependencies (`fio`, `nvme-cli`, `python3-tkinter`)
+   - Set proper permissions for all shell scripts
+   - Verify the installation
+
+3. **Start using the tool**:
+   ```bash
+   # GUI version (recommended)
+   python3 nvme_stress_gui.py
+   
+   # Command line version
+   sudo ./nvme.sh
+   ```
+
+### Manual Installation
+
+If you prefer to install manually:
+```bash
+# Install dependencies
+sudo apt update
+sudo apt install fio nvme-cli python3-tkinter
+
+# Make scripts executable
+chmod +x *.sh
+```
+
 ## Features
 
 - **Drive Selection**: Automatically detects and lists all NVMe drives in your system
