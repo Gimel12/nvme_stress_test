@@ -1,0 +1,22 @@
+# Ignore log files
+*.log
+
+# Ignore git files
+.git
+.gitignore
+
+# Ignore Docker files from being copied into the image
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Ignore results directory (will be mounted as volume)
+results/
+
+# Ignore any temporary files
+*.tmp
+*.temp
+
+# Ignore any backup files
+*~
+*.bak

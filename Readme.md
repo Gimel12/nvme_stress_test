@@ -37,6 +37,39 @@ sudo apt install fio nvme-cli python3-tkinter
 chmod +x *.sh
 ```
 
+### Docker Installation (Recommended for Easy Deployment)
+
+For the easiest deployment with all dependencies included:
+
+1. **Install Docker** (if not already installed):
+   ```bash
+   curl -fsSL https://get.docker.com -o get-docker.sh
+   sudo sh get-docker.sh
+   ```
+
+2. **Clone the repository**:
+   ```bash
+   git clone https://github.com/Gimel12/nvme_stress_test.git
+   cd nvme_stress_test
+   ```
+
+3. **Run the containerized GUI**:
+   ```bash
+   ./run-docker.sh
+   ```
+
+**Docker Benefits:**
+- ✅ All dependencies pre-installed
+- ✅ No permission issues
+- ✅ Consistent environment across systems
+- ✅ Easy cleanup and removal
+- ✅ Isolated from host system
+
+**Requirements for Docker version:**
+- Linux system with X11 (for GUI display)
+- Docker with privileged container support (for direct NVMe access)
+- NVMe drives must be accessible from the host system
+
 ## Features
 
 - **Drive Selection**: Automatically detects and lists all NVMe drives in your system

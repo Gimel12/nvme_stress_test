@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  nvme-stress-test:
+    build: .
+    container_name: nvme-stress-gui
+    privileged: true  # Required for direct NVMe access
+    volumes:
+      # Mount X11 socket for GUI display
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Mount /dev for direct hardware access
+      - /dev:/dev:rw
+      # Mount /sys for system information
+      - /sys:/sys:ro
+      # Optional: Mount a directory for test results
+      - ./results:/app/results
+    environment:
+      - DISPLAY=${DISPLAY}
+    network_mode: host
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
