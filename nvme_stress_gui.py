@@ -12,6 +12,15 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread
 from PyQt5.QtGui import QFont, QIcon, QTextCursor
 
+# AI Analysis imports
+try:
+    import openai
+    from dotenv import load_dotenv
+    load_dotenv()  # Load environment variables from .env file
+    AI_AVAILABLE = True
+except ImportError:
+    AI_AVAILABLE = False
+
 class WorkerThread(QThread):
     update_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(bool, str)
@@ -241,11 +250,26 @@ class NVMeStressTestGUI(QMainWindow):
         results_layout.addWidget(QLabel("Temperature Log:"))
         results_layout.addWidget(self.temp_output)
         
+        # Buttons layout
+        buttons_layout = QHBoxLayout()
+        
         # Open log button
         self.open_log_button = QPushButton("Open Log File")
         self.open_log_button.clicked.connect(self.open_log_file)
         self.open_log_button.setEnabled(False)
-        results_layout.addWidget(self.open_log_button)
+        buttons_layout.addWidget(self.open_log_button)
+        
+        # AI Analyze button
+        self.ai_analyze_button = QPushButton("🤖 AI Analyze")
+        self.ai_analyze_button.clicked.connect(self.ai_analyze_log)
+        self.ai_analyze_button.setEnabled(False)
+        if not AI_AVAILABLE:
+            self.ai_analyze_button.setToolTip("Install openai and python-dotenv packages to enable AI analysis")
+        else:
+            self.ai_analyze_button.setToolTip("Analyze test results using AI to identify issues and provide recommendations")
+        buttons_layout.addWidget(self.ai_analyze_button)
+        
+        results_layout.addLayout(buttons_layout)
         
         # Setup timer for progress updates
         self.timer = QTimer()
@@ -511,6 +535,10 @@ class NVMeStressTestGUI(QMainWindow):
         self.stop_button.setEnabled(False)
         self.open_log_button.setEnabled(True)
         
+        # Enable AI analyze button if AI is available and we have a log file
+        if AI_AVAILABLE and self.log_file and os.path.exists(self.log_file):
+            self.ai_analyze_button.setEnabled(True)
+        
         if success:
             QMessageBox.information(self, "Test Complete", message)
         else:
@@ -548,6 +576,107 @@ class NVMeStressTestGUI(QMainWindow):
             subprocess.Popen(["xdg-open", self.log_file])
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to open log file: {str(e)}")
+    
+    def ai_analyze_log(self):
+        """Analyze the test log using OpenAI API"""
+        if not AI_AVAILABLE:
+            QMessageBox.warning(self, "AI Analysis Unavailable", 
+                              "Please install required packages:\n\n"
+                              "pip install openai python-dotenv")
+            return
+        
+        if not self.log_file or not os.path.exists(self.log_file):
+            QMessageBox.warning(self, "Warning", "Log file not found")
+            return
+        
+        # Check for OpenAI API key
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            QMessageBox.warning(self, "API Key Missing", 
+                              "Please set your OpenAI API key:\n\n"
+                              "1. Create a .env file in the project directory\n"
+                              "2. Add: OPENAI_API_KEY=your_api_key_here\n\n"
+                              "Or set the environment variable OPENAI_API_KEY")
+            return
+        
+        try:
+            # Show progress dialog
+            progress_dialog = QMessageBox(self)
+            progress_dialog.setWindowTitle("AI Analysis")
+            progress_dialog.setText("Analyzing test results with AI...\nThis may take a few moments.")
+            progress_dialog.setStandardButtons(QMessageBox.NoButton)
+            progress_dialog.show()
+            QApplication.processEvents()
+            
+            # Read the log file
+            with open(self.log_file, 'r') as f:
+                log_content = f.read()
+            
+            # Prepare the prompt for AI analysis
+            prompt = self._create_analysis_prompt(log_content)
+            
+            # Call OpenAI API
+            client = openai.OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are an expert NVMe storage analyst. Analyze test logs and provide concise, actionable insights about drive health, performance, and any issues found."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.3
+            )
+            
+            progress_dialog.close()
+            
+            # Display the analysis result
+            analysis = response.choices[0].message.content
+            self._show_analysis_result(analysis)
+            
+        except Exception as e:
+            progress_dialog.close()
+            QMessageBox.critical(self, "AI Analysis Error", 
+                               f"Failed to analyze log file:\n{str(e)}")
+    
+    def _create_analysis_prompt(self, log_content):
+        """Create a structured prompt for AI analysis"""
+        return f"""Please analyze this NVMe stress test log and provide a concise report with the following:
+
+1. **Overall Test Result**: PASS/FAIL with brief explanation
+2. **Temperature Analysis**: Any thermal issues or concerns
+3. **Performance Issues**: Any performance degradation or anomalies
+4. **Error Analysis**: Any errors, warnings, or concerning patterns
+5. **Drive Health**: Assessment of drive condition
+6. **Recommendations**: Specific actions if issues found
+
+Keep the analysis concise but thorough. Focus on actionable insights.
+
+--- TEST LOG ---
+{log_content[:8000]}  # Limit to first 8000 chars to stay within token limits
+--- END LOG ---"""
+    
+    def _show_analysis_result(self, analysis):
+        """Display the AI analysis result in a dialog"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("🤖 AI Analysis Results")
+        dialog.setMinimumSize(600, 400)
+        
+        layout = QVBoxLayout()
+        
+        # Analysis text
+        text_edit = QTextEdit()
+        text_edit.setPlainText(analysis)
+        text_edit.setReadOnly(True)
+        text_edit.setFont(QFont("Arial", 10))
+        layout.addWidget(text_edit)
+        
+        # Close button
+        close_button = QPushButton("Close")
+        close_button.clicked.connect(dialog.close)
+        layout.addWidget(close_button)
+        
+        dialog.setLayout(layout)
+        dialog.exec_()
 
 
 if __name__ == "__main__":

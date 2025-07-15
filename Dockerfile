@@ -18,6 +18,10 @@ RUN apt-get update && apt-get install -y \
     x11-apps \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy requirements and install Python dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
+
 # Create a non-root user for running the application
 RUN useradd -m -s /bin/bash nvmeuser && \
     echo "nvmeuser ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers

@@ -77,6 +77,7 @@ For the easiest deployment with all dependencies included:
 - **Temperature Monitoring**: Logs drive temperature every 5 seconds during the test
 - **SMART Data Collection**: Captures drive health metrics before and after testing
 - **AI Workload Simulation**: Uses realistic I/O patterns that mimic AI training and inference
+- **🤖 AI Analysis**: Intelligent analysis of test results using OpenAI to identify issues, temperature problems, and provide recommendations
 
 ## Usage
 
@@ -85,6 +86,36 @@ sudo ./nvme.sh
 ```
 
 The script requires root privileges to access the drives directly.
+
+## AI Analysis Setup
+
+To enable the AI analysis feature, you need to set up your OpenAI API key:
+
+1. **Get an OpenAI API key** from [OpenAI Platform](https://platform.openai.com/api-keys)
+
+2. **Create a `.env` file** in the project directory:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Add your API key** to the `.env` file:
+   ```
+   OPENAI_API_KEY=your_api_key_here
+   ```
+
+4. **Install Python dependencies** (if not already done):
+   ```bash
+   pip3 install -r requirements.txt
+   ```
+
+Once configured, the 🤖 **AI Analyze** button will be enabled in the GUI after running a test. The AI will analyze your test logs and provide:
+
+- Overall test result (PASS/FAIL)
+- Temperature analysis and thermal concerns
+- Performance issue identification
+- Error analysis and patterns
+- Drive health assessment
+- Specific recommendations for any issues found
 
 ## Test Parameters
 

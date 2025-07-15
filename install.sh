@@ -71,6 +71,26 @@ else
     echo "✅ python3-tkinter is already available"
 fi
 
+# Install pip if not present
+if ! command_exists pip3; then
+    install_package "python3-pip"
+else
+    echo "✅ pip3 is already installed"
+fi
+
+# Install Python requirements if requirements.txt exists
+if [[ -f "$SCRIPT_DIR/requirements.txt" ]]; then
+    echo "📦 Installing Python dependencies..."
+    if pip3 install -r "$SCRIPT_DIR/requirements.txt"; then
+        echo "✅ Python dependencies installed successfully"
+    else
+        echo "⚠️  Some Python dependencies may have failed to install"
+        echo "   You can install them manually with: pip3 install -r requirements.txt"
+    fi
+else
+    echo "ℹ️  No requirements.txt found, skipping Python dependencies"
+fi
+
 echo "🔧 Setting up file permissions..."
 
 # Get the directory where the script is located
