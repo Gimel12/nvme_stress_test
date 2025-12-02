@@ -16,3 +16,11 @@ __pycache__/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Test results and generated reports
+*_read.json
+*_write.json
+*_peak.json
+nvme_stress_test_report.html
+nvme_stress_test_report.pdf
+update_output.txt
